@@ -62,6 +62,7 @@ class Pricing:
         self.pricing.optimize()
 
     def get_reduced_cost(self):
+
         if self.use_model:
             return 1 - self.pricing.objVal
         else:
@@ -79,10 +80,15 @@ class Pricing:
             exact_coe = [round(v.x) for v in self.y.values()]
             if self.s is not None:
                 sr_coe = [round(v.x) for v in self.z.values()]
+            res = [exact_coe + sr_coe]
         else:
-            exact_coe = [1 if i in self.lab.labels[0].v else 0 for i in range(self.n)]
-            sr_coe = self.lab.labels[0].z
-        return exact_coe + sr_coe
+            res = []
+            for label in self.lab.labels:
+                exact_coe = [1 if i in label.v else 0 for i in range(self.n)]
+                sr_coe = label.z
+                res.append(exact_coe + sr_coe)
+
+        return res
 
     def solve(self, ex_dual, sr_dual, data, graph):
         """

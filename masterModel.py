@@ -9,6 +9,7 @@ import itertools
 import random
 from pricing import Pricing as Pr
 from graph import Graph
+import copy
 
 
 class Enumeration:
@@ -55,22 +56,46 @@ class SeparateEnumerate(Enumeration):
 
 
 class MasterModel:
-    def __init__(self, data, add_cuts=False):
-        self.model = Model("1D-BPP")  # restricted master problem
+    def __init__(self, data, add_cuts=True, **kwargs):
+        self.model = kwargs.get('model', None)  # restricted master problem
         self.data = data
         self.add_cuts = add_cuts  # add inequalities or not
-        self.pricing = None  # Pricing class
-        self.x = None  # x variables
+        self.pricing = kwargs.get('pricing', None)  # Pricing class
+        self.x = kwargs.get('x', None)  # x variables
         self.var_num = self.data.n  # number of variables
-        self.constraints, self.sr = None, None  # constraints
-        self.s = None  # sr inequality index ((1, 2, 3), (4, 5, 6),...)
-        self.graph = Graph()  # 初始化无向图定义不相容的边
+        self.constraints, self.sr = \
+            kwargs.get('constraints', None), kwargs.get('sr', None)  # constraints
+        self.s = kwargs.get('s', None)  # sr inequality index ((1, 2, 3), (4, 5, 6),...)
+        self.graph = kwargs.get('graph', Graph())  # 初始化无向图定义不相容的边
         self.item_id = [item.id for item in self.data.items]  # item_id
-        if add_cuts:
+        if add_cuts and self.s is None:
             self.initialize_param()
-        self.initialize_model()
+        if self.model is None:
+            self.model = Model("1D-BPP")
+            self.initialize_model()
+        if self.pricing is None:
+            self.pricing = self.get_pricing_instance()
 
-        self.pricing = self.get_pricing_instance()
+    def __copy__(self):
+        """
+        when copy.copy is invoked
+        :return:
+        """
+        data = copy.deepcopy(self.data)
+        assert data.items is not self.data.items
+
+        self.model.update()
+        model = self.model.copy()
+
+        pricing = self.pricing
+
+        x = copy.copy(self.x)
+        constraints, sr = copy.copy(self.constraints), copy.copy(self.sr)
+        s = self.s
+        graph = copy.deepcopy(self.graph)
+
+        return MasterModel(data=data, add_cuts=self.add_cuts, model=model, pricing=pricing, x=x, constraints=constraints,
+                           sr=sr, s=s, graph=graph)
 
     def initialize_param(self, enu_class=SeparateEnumerate):
         enu = enu_class(self.item_id)
@@ -80,9 +105,15 @@ class MasterModel:
         self.model.setObjective(expr, sense)
 
     def add_col(self, coe):
-        col = Column(coe, self.model.getConstrs())
-        self.var_num += 1
-        self.model.addVar(vtype=GRB.CONTINUOUS, obj=1, column=col, name=f"x[{self.var_num}]")
+        """
+
+        :param coe: [[], []]
+        :return:
+        """
+        for c in coe:
+            col = Column(c, self.model.getConstrs())
+            self.var_num += 1
+            self.model.addVar(vtype=GRB.CONTINUOUS, obj=1, column=col, name=f"x[{self.var_num}]")
 
     def initialize_model(self):
         self.x = self.model.addVars(tuple(range(1, self.data.n + 1)),
@@ -138,10 +169,14 @@ class MasterModel:
         return self.pricing.get_coe()
 
     def removeConstrById(self, constraint_id):
-        self.model.remove(self.constraints[constraint_id])
+        constr_name = self.constraints[constraint_id].constrName
+        self.model.remove(self.model.getConstrByName(constr_name))
+        self.constraints.pop(constraint_id)
 
     def removeVarById(self, var_id):
-        self.model.remove(self.x[var_id])
+        var_name = f"x[{var_id}]"
+        if self.model.getVarByName(var_name) is not None:
+            self.model.remove(self.model.getVarByName(var_name))
 
 
 if __name__ == '__main__':

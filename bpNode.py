@@ -5,6 +5,7 @@
 # @Email : zhengsx95@163.com
 # Description:
 from uti import ComparisonEpsilon
+import copy
 
 
 class Node:
@@ -15,14 +16,24 @@ class Node:
         # p = {(id1, id2): {1, 2,},...}存储所有同时包含这两个items的列序号
         # q = {(id1, id2): {1, 2,},...}存储所有仅包含这两个items其中之一的列序号
         self.p, self.q = kwargs.get("p", {}), kwargs.get("q", {})
-        self.solution = None
+        self.solution = kwargs.get("solution", None)
+
+    def __copy__(self):
+        return Node(copy.copy(self.rmp), p=copy.deepcopy(self.p), q=copy.deepcopy(self.q),
+                    solution=self.solution)
 
     def get_solution(self):
         if self.solution is None:
             raise AttributeError("solution is None")
         return self.solution.solutions
 
+    def update_param(self, coe):
+
+        for c in coe:
+            self.update_pq(c)
+
     def update_pq(self, coe):
+
         items = self.rmp.data.items
         var_num = self.rmp.var_num
         for i, item in enumerate(items):
@@ -38,18 +49,6 @@ class Node:
                             self.q[item.id, _item.id] = {var_num + 1}
                         else:
                             self.q[item.id, _item.id].add(var_num + 1)
-
-    def should_be_pruned(self, incumbent):
-        # 没有前途的结点，其松弛下界不小于当前存在的最好解（如果存在）
-        if incumbent.value is not None and incumbent.value <= self.solution.value:
-            return True
-
-        # 如果该节点是可行的，则更新结点(如果该结点更好)
-        if self.solution.is_integer_solution():
-            incumbent.update(self.solution)
-            return True
-
-        return False
 
     def __le__(self, other):
         return self.solution.value <= other.solution.value + ComparisonEpsilon

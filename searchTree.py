@@ -11,7 +11,8 @@ from solution import Solution
 from columnGeneration import ColumnGeneration as CG
 from uti import is_integer
 from instance import Item
-from copy import deepcopy
+import copy
+import time
 
 
 class Brancher:
@@ -29,12 +30,12 @@ class BinaryBranch(Brancher):
     @ staticmethod
     def find_items(node):
         """
-        :param node: list[Gurobi.var,...]
+        :param node:
         :return:
         """
         x, y = None, None
         items = node.rmp.data.items
-        sols = {v.varName: v for v in node.get_solution()}
+        sols = {v.varName: v.x for v in node.get_solution()}
         min_value = float("inf")
         for ind, item in enumerate(items):
             for _ind, _item in enumerate(items):
@@ -52,11 +53,12 @@ class BinaryBranch(Brancher):
                     if abs(miu - 0.5) < min_value:
                         min_value = abs(miu - 0.5)
                         x, y = item, _item
-
+        assert x is not None and y is not None, f"{x=}\t{y=}"
         return x, y
 
     def generate_branches(self, node):
         item1, item2 = self.find_items(node)  # 找到两个item
+
         return [BranchDecisions(item1, item2, 1), BranchDecisions(item1, item2, 0)]
 
 
@@ -72,8 +74,7 @@ class BranchDecisions:
         self.value = value
 
     def apply(self, node):
-        # fixme: 简单使用了深拷贝
-        new_node = deepcopy(node)
+        new_node = copy.copy(node)
         if self.value == 1:  # item1和item2必须在同一pattern中
             changed_index, changed_item = -1, None
             items = node.rmp.data.items
@@ -95,7 +96,7 @@ class BranchDecisions:
             assert new_node.rmp.graph is graph
 
             # 3.在rmp中删除item2对应的行以及所有只包含item1和item2其中一个的列,并更新node.q
-            new_node.removeConstrById(self.item2.id)
+            new_node.rmp.removeConstrById(self.item2.id)
             for q in node.q[self.item1.id, self.item2.id]:
                 # fixme:未更新q 考虑捕捉该函数异常
                 new_node.rmp.removeVarById(q)
@@ -118,30 +119,56 @@ class BranchDecisions:
 
 
 class SearchTree:
-    def __init__(self, instance):
+    def __init__(self, instance, verbose=True):
         self.instance = instance
         self.queue = MyQueue()  # 初始化列表，默认深度优先（depth-first）
         self.incumbent = Solution()  # 初始化最优解
+        self.verbose = verbose  # 是否打印相关参数
+        self.n_nodes = 0  # 求解的总结点数目
 
     def solve(self):
+        start_time = time.time()
         m = MasterModel(self.instance)  # 初始化限制主问题(restrict master problem, RMP)
         node = Node(m)  # 初始化根节点
+        if self.verbose:
+            print("creating RMP in root node: done")
         self.queue.push(node)  # 节点入队列
-
+        if self.verbose:
+            print(f"\nSearch strategy: {self.queue.strategy}-first")
         while not self.queue.empty():
             node = self.queue.pop()  # 弹出节点
+            self.n_nodes += 1
+            if self.verbose:
+                print(f"\nThe {self.n_nodes}th iteration, level = {node.level}")
 
             # 列生成求解该节点对应的RMP
+            # print(f"{node.rmp.data.n=}")
             cg = CG(node)
             node.solution = cg.solve()  # 返回列生成求解的结果
-
-            print(f"{node.solution=}")
-            if node.should_be_pruned(self.incumbent):  # 如果该结点不应该继续分支，结束当前循环，且更新incumbent, if any
+            node.rmp.model.write(f"rmp{self.n_nodes}.lp")
+            # fathomed节点的两种情形
+            # 1.该节点最小值大于当前最佳可行解目标值
+            if self.incumbent.value is not None and \
+                    self.incumbent.value <= node.solution.value:
+                if self.verbose:
+                    print(f"The node is not promising with value being {node.solution.value}")
                 continue
-
+            # 2.该节点是可行解
+            if node.solution.is_integer_solution():  # 如果是整数解，比较更新结果
+                self.incumbent.update(node.solution)
+                if self.verbose:
+                    print(f"\nFind a new feasible solution, value={node.solution.value}")
+                continue
+            if self.verbose:
+                print(f"The node should be branched, and value={node.solution.value}")
             branches = BinaryBranch().branching(node)
             for branch in branches:  # 结点分支定添加进入队列
                 self.queue.push(branch.apply(node))
+            # assert self.queue.data[0].rmp.data.items is not self.queue.data[1].rmp.data.items
+        end_time = time.time()
+        if self.verbose:
+            print(f"\nSolved {self.n_nodes} node(s) in {end_time - start_time}s\n"
+                  f"objective value = {self.incumbent.value}")
 
 
 if __name__ == '__main__':

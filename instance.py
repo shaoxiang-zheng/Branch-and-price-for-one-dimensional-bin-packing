@@ -5,18 +5,23 @@
 # @Email : zhengsx95@163.com
 # Description:
 from collections import namedtuple
+import random
 Item = namedtuple("Item", "id width")
 
 
 class Instance:
-    def __init__(self, file_name=None):
+    def __init__(self, file_name=None, seed=0):
         self.capacity = None
         self.n = None
         self.items = None
         if file_name is not None:
             self.load_file(file_name)
         else:
-            # todo: generate random instance
+            random.seed(seed)
+            self.capacity = 20
+            self.n = 50
+            self.items = [Item(id=i + 1, width=random.randint(1, self.capacity))
+                          for i in range(self.n)]
             pass
 
     def load_file(self, file_name):

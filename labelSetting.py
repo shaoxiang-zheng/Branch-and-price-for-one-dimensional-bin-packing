@@ -76,7 +76,6 @@ class Label:
         :param v: 1 indicates that item i should be packed, 0 otherwise
         :return:
         """
-        assert v == 0 or v == 1
         if v == 0:
             return Label(self.data, self.s, self.miu, self.lamb,
                          j=i, w=self.w, c=self.c, v=self.v, o=self.o[1:], r=self.r, z=self.z)
@@ -105,7 +104,7 @@ class Label:
 
 
 class LabelSetting:
-    def __init__(self, data, s, miu, lamb, graph):
+    def __init__(self, data, s, miu, lamb, graph, verbose=False):
         """
         :param data:
         :param s: # [(1, 2, 3),...]
@@ -119,6 +118,7 @@ class LabelSetting:
         self.lamb = {key: value for key, value in zip(s, lamb)} if s is not None else {}  # sr dual value
         self.graph = graph
         self.labels = []  # all completed labels
+        self.verbose = verbose
 
     @ staticmethod
     def update(labels):
@@ -126,21 +126,23 @@ class LabelSetting:
         for ind, label in enumerate(labels):
             for _ind, _label in enumerate(labels):
                 if ind < _ind:
+                    dominate = dominated = False
+                    # 如果两个label支配则不删除
                     if label.dominate(_label):
-                        n_dominated[_ind] += 1
+                        dominate = True
                     if _label.dominate(label):
+                        dominated = True
+                    if dominate and dominated:
+                        pass  # 相互支配
+                    elif dominate:
+                        n_dominated[_ind] += 1
+                    elif dominated:
                         n_dominated[ind] += 1
         return [label for i, label in enumerate(labels) if n_dominated[i] == 0]
 
-    def filter(self, delta=1):
-        if len(self.labels) == 0:
-            return
+    def filter(self, delta=5):
 
-        labels = []
-        for i in range(delta):
-            item = heapq.heappop(self.labels)
-            labels.append(item)
-        self.labels = labels
+        self.labels = heapq.nsmallest(delta, self.labels)
 
     def solve(self):
         n = len(self.data.items)
@@ -149,17 +151,32 @@ class LabelSetting:
         labels = {i: [] for i in range(-1, n)}  # {i: [Label()]} all labels with last considered item being index i
         labels[-1] = [label]
         for j in range(-1, n):
-
+            if self.verbose:
+                print(f"\n{j=}")
+                print(f"before dominated there are {len(labels[j])} labels")
             labels[j] = self.update(labels[j])  # filter the set by dominance rule
+            if self.verbose:
+                print(f"after dominated there are {len(labels[j])} labels")
             for label in labels[j]:
                 if not label.o:  # 不存在待考虑item
+                    if self.verbose:
+                        print(f"The label is completed: {label}")
                     heapq.heappush(self.labels, label)
                 else:
                     i = label.o[0]  # 下一个待考虑item index
+                    if self.verbose:
+                        print(f"item index = {i} item id = {self.data.items[i].id} is considered")
+
                     for v in [1, 0]:
+                        if self.verbose:
+                            print(f"item id = {self.data.items[i].id} is " + ('packed' if v == 1 else 'discarded'))
                         new_label = label.extend(i, self.graph, v=v)
+                        if self.verbose:
+                            print(f"The new label is {new_label}")
                         if not new_label.should_be_fathomed():
                             labels[i].append(new_label)
+                        elif self.verbose:
+                            print("The label if fathomed")
 
         self.filter()
         return self.labels
