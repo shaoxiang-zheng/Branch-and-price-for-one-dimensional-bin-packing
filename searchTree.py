@@ -145,7 +145,7 @@ class SearchTree:
             # print(f"{node.rmp.data.n=}")
             cg = CG(node)
             node.solution = cg.solve()  # 返回列生成求解的结果
-            node.rmp.model.write(f"rmp{self.n_nodes}.lp")
+            # node.rmp.model.write(f"rmp{self.n_nodes}.lp")
             # fathomed节点的两种情形
             # 1.该节点最小值大于当前最佳可行解目标值
             if self.incumbent.value is not None and \

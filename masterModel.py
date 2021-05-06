@@ -116,10 +116,10 @@ class MasterModel:
             self.model.addVar(vtype=GRB.CONTINUOUS, obj=1, column=col, name=f"x[{self.var_num}]")
 
     def initialize_model(self):
-        self.x = self.model.addVars(tuple(range(1, self.data.n + 1)),
-                                    vtype=GRB.CONTINUOUS, name="x")
+        x_index = tuple(range(1, self.data.n + 1))
+        self.x = self.model.addVars(x_index, vtype=GRB.CONTINUOUS, name="x")
         self.constraints = self.model.addConstrs(
-            (self.x[i] == 1 for i in range(1, self.data.n + 1)), name="exact")
+            (self.x[i] == 1 for i in x_index), name="exact")
 
         self.setObjective(self.x.sum(), GRB.MINIMIZE)
         if self.add_cuts:
@@ -128,6 +128,7 @@ class MasterModel:
 
             for c in self.sr.values():
                 c.setAttr("RHS", 1)
+
         self.model.update()
         self.set_parameters()
 

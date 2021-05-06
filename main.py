@@ -9,6 +9,7 @@
 from instance import Instance
 import basicmodel
 from searchTree import SearchTree
+import cProfile
 
 if __name__ == '__main__':
     instance = Instance()  # 读取文件生成1D-BPP实例
@@ -17,8 +18,9 @@ if __name__ == '__main__':
     bp = basicmodel.BinPacking({item.id: item for item in instance.items}, instance.capacity)
 
     m = bp.solve()
-    bp.print_variables()
+    # bp.print_variables()
     print(f"{m.Runtime=}\t{m.objVal=}")
     print(f"-" * 60)
     tree = SearchTree(instance, verbose=True)  # 初始化搜索树
     tree.solve()
+    # cProfile.run('tree.solve()', sort=1)

@@ -49,25 +49,30 @@ class Label:
         if self.j != other.j:
             return False
         if self.c - sum(self.lamb[s] for s in self.r if self.r[s] == 1 and other.r[s] == 0) > \
-                other.c - sum(self.miu[i] for i in other.o if i not in self.o):
+                other.c - sum(self.miu[i] for i in other.o if i not in self.o) + ComparisonEpsilon:
             return False
         return True
 
     def should_be_fathomed(self):
-        if self.c + ComparisonEpsilon >= 0 and not self.o:
-            return True
+        # This may be time-consuming
+        # if self.c + ComparisonEpsilon >= 0 and not self.o:
+        #     return True
+        #
+        # lower = Model("lower")
+        # z = lower.addVars(self.o, vtype=GRB.BINARY, name="z")
+        # lower.addConstr(quicksum(z[i] * self.data.items[i].width for i in self.o),
+        #                 GRB.LESS_EQUAL, self.data.capacity - self.w, name='c')
+        # lower.setObjective(quicksum(-self.miu[i] * z[i] for i in self.o), GRB.MINIMIZE)
+        # lower.Params.OutputFlag = 0
+        # lower.optimize()
+        #
+        # if lower.objVal + self.c + ComparisonEpsilon >= 0:
+        #     return True
+        # return False
 
-        lower = Model("lower")
-        z = lower.addVars(self.o, vtype=GRB.BINARY, name="z")
-        lower.addConstr(quicksum(z[i] * self.data.items[i].width for i in self.o),
-                        GRB.LESS_EQUAL, self.data.capacity - self.w, name='c')
-        lower.setObjective(quicksum(-self.miu[i] * z[i] for i in self.o), GRB.MINIMIZE)
-        lower.Params.OutputFlag = 0
-        lower.optimize()
-
-        if lower.objVal + self.c + ComparisonEpsilon >= 0:
-            return True
-        return False
+        # we derive a simple bound as follows:
+        lower = -sum(self.miu[i] for i in self.o)
+        return self.c + lower + ComparisonEpsilon >= 0
 
     def extend(self, i, graph, v=1):
         """
@@ -81,7 +86,7 @@ class Label:
                          j=i, w=self.w, c=self.c, v=self.v, o=self.o[1:], r=self.r, z=self.z)
         else:
             items, capacity = self.data.items, self.data.capacity
-            z = self.z[:]
+            z = [0] * len(self.lamb)
             c = self.c - self.miu[i]
             r = {}
             sum_lamb = 0
@@ -91,10 +96,11 @@ class Label:
                 if items[i].id not in s:
                     r[s] = b
                 else:
-                    r[s] = (b + 1) % 2
                     if b == 1:
                         sum_lamb += self.lamb[s]
                         z[k] = 1
+                    r[s] = (b + 1) % 2
+
             c -= sum_lamb
             o = [h for h in self.o[1:] if self.w + items[i].width + items[h].width <= capacity and
                  items[h].id not in graph.neighbors(items[i].id)]
@@ -126,18 +132,11 @@ class LabelSetting:
         for ind, label in enumerate(labels):
             for _ind, _label in enumerate(labels):
                 if ind < _ind:
-                    dominate = dominated = False
-                    # 如果两个label支配则不删除
                     if label.dominate(_label):
-                        dominate = True
-                    if _label.dominate(label):
-                        dominated = True
-                    if dominate and dominated:
-                        pass  # 相互支配
-                    elif dominate:
                         n_dominated[_ind] += 1
-                    elif dominated:
+                    elif _label.dominate(label):
                         n_dominated[ind] += 1
+
         return [label for i, label in enumerate(labels) if n_dominated[i] == 0]
 
     def filter(self, delta=5):

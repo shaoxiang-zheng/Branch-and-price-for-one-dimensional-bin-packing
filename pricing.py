@@ -30,7 +30,6 @@ class Pricing:
                                GRB.LESS_EQUAL, data.capacity, name="capacity")
 
         if self.s is not None:
-            # print(f"{self.s=}")
             self.z = self.pricing.addVars(self.s, vtype=GRB.BINARY, name="z")
 
             # self.s中item id可能已经被删除，因此添加条件i in item_id and j in item_id
