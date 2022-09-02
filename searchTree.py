@@ -35,7 +35,8 @@ class BinaryBranch(Brancher):
         """
         x, y = None, None
         items = node.rmp.data.items
-        sols = {v.varName: v.x for v in node.get_solution()}
+        sols = {key: value for key, value in node.get_solution().items() if value > 0}
+
         min_value = float("inf")
         for ind, item in enumerate(items):
             for _ind, _item in enumerate(items):
@@ -110,7 +111,8 @@ class BranchDecisions:
                 new_node.rmp.removeVarById(p)
         else:
             raise ValueError("")
-        new_node.level += 1
+
+        new_node.level = node.level + 1
         return new_node
 
     def __repr__(self):
@@ -119,16 +121,18 @@ class BranchDecisions:
 
 
 class SearchTree:
-    def __init__(self, instance, verbose=True):
+    def __init__(self, instance, verbose=True, **kwargs):
         self.instance = instance
         self.queue = MyQueue()  # 初始化列表，默认深度优先（depth-first）
         self.incumbent = Solution()  # 初始化最优解
         self.verbose = verbose  # 是否打印相关参数
         self.n_nodes = 0  # 求解的总结点数目
 
+        self.init_columns = kwargs.get('init_columns', None)
+
     def solve(self):
         start_time = time.time()
-        m = MasterModel(self.instance)  # 初始化限制主问题(restrict master problem, RMP)
+        m = MasterModel(self.instance, init_columns=self.init_columns)  # 初始化限制主问题(restrict master problem, RMP)
         node = Node(m)  # 初始化根节点
         if self.verbose:
             print("creating RMP in root node: done")
@@ -148,6 +152,7 @@ class SearchTree:
             # node.rmp.model.write(f"rmp{self.n_nodes}.lp")
             # fathomed节点的两种情形
             # 1.该节点最小值大于当前最佳可行解目标值
+            # print(self.incumbent.value, node.solution.value)
             if self.incumbent.value is not None and \
                     self.incumbent.value <= node.solution.value:
                 if self.verbose:

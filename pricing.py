@@ -4,8 +4,8 @@
 # Author: Zheng Shaoxiang
 # @Email : zhengsx95@163.com
 # Description:
-from gurobimodel import *
 from labelSetting import LabelSetting
+from gurobipy import *
 
 
 class Pricing:
@@ -26,8 +26,7 @@ class Pricing:
         w = {item.id: item.width for item in data.items}
         self.y = self.pricing.addVars(item_id, vtype=GRB.BINARY, name="y")
 
-        self.pricing.addConstr(quicksum(self.y[i] * w[i] for i in item_id),
-                               GRB.LESS_EQUAL, data.capacity, name="capacity")
+        self.pricing.addConstr(quicksum(self.y[i] * w[i] for i in item_id) <= data.capacity, name="capacity")
 
         if self.s is not None:
             self.z = self.pricing.addVars(self.s, vtype=GRB.BINARY, name="z")

@@ -18,8 +18,8 @@ class Instance:
             self.load_file(file_name)
         else:
             random.seed(seed)
-            self.capacity = 20
-            self.n = 40
+            self.capacity = 10
+            self.n = 50
             self.items = [Item(id=i + 1, width=random.randint(1, self.capacity))
                           for i in range(self.n)]
             pass

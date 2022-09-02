@@ -35,7 +35,9 @@ class ColumnGeneration:
             # print(f"{reduced_cost=}")
             if reduced_cost + ReducedEpsilon >= 0:  # reduced cost为正
                 assert self.node.rmp is self.rmp
-                return Solution(self.rmp.get_objVal(), self.rmp.getVars())  # 返回此时的RMP最优解
+                solution = {v.varName: v.x for v in self.rmp.getVars()}
+                self.rmp.model.update()
+                return Solution(self.rmp.get_objVal(), solution, self.rmp.model.copy())  # 返回此时的RMP最优解
 
             # 4.此时存在reduced cost < 0的列，返回并在rmp中添加该列
             coe = self.rmp.get_pricing_coe()  # [[], []]
