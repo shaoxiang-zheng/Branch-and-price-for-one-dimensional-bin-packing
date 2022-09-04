@@ -27,7 +27,7 @@ class Brancher:
 
 
 class BinaryBranch(Brancher):
-    @ staticmethod
+    @staticmethod
     def find_items(node):
         """
         :param node:
@@ -103,7 +103,7 @@ class BranchDecisions:
 
             # 4.删除列（该列在合并后已经不可行的列）
             model = new_node.rmp.model
-            items = {item.id:item for item in new_node.rmp.data.items}
+            items = {item.id: item for item in new_node.rmp.data.items}
             capacity = new_node.rmp.data.capacity
 
             model.update()
@@ -167,6 +167,8 @@ class SearchTree:
             # print(f"{node.rmp.data.n=}")
             cg = CG(node)
             node.solution = cg.solve()  # 返回列生成求解的结果
+            if node.solution is None:
+                continue
             # node.rmp.model.write(f"rmp{self.n_nodes}.lp")
 
             # fathomed节点的两种情形

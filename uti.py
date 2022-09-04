@@ -4,7 +4,7 @@
 # Author: Zheng Shaoxiang
 # @Email: zhengsx95@163.com
 # Description:
-from enum import Enum
+from enum import IntEnum
 
 ReducedEpsilon = 1e-5
 
@@ -19,7 +19,7 @@ def is_integer(num):
     return False
 
 
-class Status(Enum):
+class Status(IntEnum):
     LOADED = 1
     OPTIMAL = 2
     INFEASIBLE = 3

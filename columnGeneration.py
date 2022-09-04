@@ -15,14 +15,16 @@ class ColumnGeneration:
         self.rmp = node.rmp
 
     def solve(self):
-        # iterations = 0
+        iterations = 0
         while True:
-            # iterations += 1
+            iterations += 1
             self.rmp.optimize()   # 单纯形法求解该模型
             # self.rmp.model.write(f'iteration-{iterations}.lp')
             # print(f"In {iterations} iteration the value is {self.rmp.get_objVal()}")
 
-            assert self.rmp.get_status() != Status.INFEASIBLE
+            # assert self.rmp.get_status() != Status.INFEASIBLE, f"iterations = {iterations}, status = {self.rmp.get_status()}"
+            if self.rmp.get_status() == Status.INFEASIBLE:
+                return None
 
             # 判断是否存在reduced cost 小于0 的列
             # 1.获取两类约束对应的对偶变量
@@ -35,6 +37,8 @@ class ColumnGeneration:
             # print(f"{reduced_cost=}")
             if reduced_cost + ReducedEpsilon >= 0:  # reduced cost为正
                 assert self.node.rmp is self.rmp
+                # print(self.rmp.getVars())
+
                 solution = {v.varName: v.x for v in self.rmp.getVars()}
                 self.rmp.model.update()
                 return Solution(self.rmp.get_objVal(), solution, self.rmp.model.copy())  # 返回此时的RMP最优解
