@@ -62,7 +62,7 @@ class MasterModel:
         self.add_cuts = add_cuts  # add inequalities or not
         self.pricing = kwargs.get('pricing', None)  # Pricing class
         self.x = kwargs.get('x', None)  # x variables
-        self.var_num = self.data.n  # number of variables
+        self.var_num = kwargs.get("var_num", None)  # number of variables
         self.constraints, self.sr = \
             kwargs.get('constraints', None), kwargs.get('sr', None)  # constraints
         self.s = kwargs.get('s', None)  # sr inequality index ((1, 2, 3), (4, 5, 6),...)
@@ -95,8 +95,8 @@ class MasterModel:
         s = self.s
         graph = copy.deepcopy(self.graph)
 
-        return MasterModel(data=data, add_cuts=self.add_cuts, model=model, pricing=pricing, x=x, constraints=constraints,
-                           sr=sr, s=s, graph=graph)
+        return MasterModel(data=data, add_cuts=self.add_cuts, model=model, pricing=pricing, x=x,
+                           constraints=constraints, sr=sr, s=s, graph=graph, var_num=self.var_num)
 
     def initialize_param(self, enu_class=SeparateEnumerate):
         enu = enu_class(self.item_id)
@@ -143,7 +143,7 @@ class MasterModel:
                                     self.init_columns[i - 1][q - 1] +
                                     self.init_columns[i - 1][r - 1] >= 2)
                     for i in x_index) <= 1 for p, q, r in self.s), name="sr")
-
+        self.var_num = len(x_index)
         self.model.update()
         self.set_parameters()
 

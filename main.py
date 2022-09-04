@@ -32,12 +32,12 @@ if __name__ == '__main__':
 
     rmp = tree.incumbent.model
     rmp.update()
+    rmp.write("mip.lp")
+    for name, v in tree.incumbent.solutions.items():
+        if v > 0:
+            print(name, v)
 
-    # for name, v in tree.incumbent.solutions.items():
-    #     if v > 0.9:
-    #         print(name, v)
-    #
-    #         column = {int(re.search(r"\d+", constr.constrName).group()): rmp.getCoeff(
-    #             constr, rmp.getVarByName(name)) for constr in rmp.getConstrs() if constr.constrName.startswith('exact')}
-    #         print(column, '\n')
+            column = {int(re.search(r"\d+", constr.constrName).group()): rmp.getCoeff(
+                constr, rmp.getVarByName(name)) for constr in rmp.getConstrs() if constr.constrName.startswith('exact')}
+            print(column, '\n')
     # cProfile.run('tree.solve()', sort=1)

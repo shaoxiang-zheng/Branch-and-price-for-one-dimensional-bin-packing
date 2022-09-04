@@ -4,6 +4,8 @@
 # Author: Zheng Shaoxiang
 # @Email : zhengsx95@163.com
 # Description:
+import math
+
 from myQueue import MyQueue
 from bpNode import Node
 from masterModel import MasterModel
@@ -148,6 +150,8 @@ class SearchTree:
 
         self.init_columns = kwargs.get('init_columns', None)
 
+        self.lb = self.ub = None
+
     def solve(self):
         start_time = time.time()
         m = MasterModel(self.instance, init_columns=self.init_columns)  # 初始化限制主问题(restrict master problem, RMP)
@@ -158,6 +162,9 @@ class SearchTree:
         if self.verbose:
             print(f"\nSearch strategy: {self.queue.strategy}-first")
         while not self.queue.empty():
+            if self.lb is not None and self.ub is not None and abs(self.lb - self.ub) <= 1e-4:
+                break
+
             node = self.queue.pop()  # 弹出节点
             self.n_nodes += 1
             if self.verbose:
@@ -167,6 +174,9 @@ class SearchTree:
             # print(f"{node.rmp.data.n=}")
             cg = CG(node)
             node.solution = cg.solve()  # 返回列生成求解的结果
+            if self.n_nodes == 1:
+                self.lb = math.ceil(node.solution.value)
+
             if node.solution is None:
                 continue
             # node.rmp.model.write(f"rmp{self.n_nodes}.lp")
@@ -182,6 +192,7 @@ class SearchTree:
             # 2.该节点是可行解
             if node.solution.is_integer_solution():  # 如果是整数解，比较更新结果
                 self.incumbent.update(node.solution)
+                self.ub = self.incumbent.value
                 if self.verbose:
                     print(f"\nFind a new feasible solution, value={node.solution.value}")
                     # print(node.rmp.data.items)
