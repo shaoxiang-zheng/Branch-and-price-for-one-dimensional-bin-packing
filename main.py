@@ -26,7 +26,7 @@ if __name__ == '__main__':
     print(f"-" * 60)
     with open("js.json") as f:
         init_columns = list(json.load(f).values())
-        print(init_columns)
+        # print(init_columns)
     tree = SearchTree(instance, verbose=True, init_columns=init_columns)  # 初始化搜索树
     tree.solve()
 

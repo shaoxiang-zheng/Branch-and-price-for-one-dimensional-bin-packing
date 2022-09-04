@@ -59,7 +59,6 @@ class BinaryBranch(Brancher):
 
     def generate_branches(self, node):
         item1, item2 = self.find_items(node)  # 找到两个item
-
         return [BranchDecisions(item1, item2, 1), BranchDecisions(item1, item2, 0)]
 
 
@@ -101,6 +100,25 @@ class BranchDecisions:
             for q in node.q[self.item1.id, self.item2.id]:
                 # fixme:未更新q 考虑捕捉该函数异常
                 new_node.rmp.removeVarById(q)
+
+            # 4.删除列（该列在合并后已经不可行的列）
+            model = new_node.rmp.model
+            items = {item.id:item for item in new_node.rmp.data.items}
+            capacity = new_node.rmp.data.capacity
+
+            model.update()
+            del_columns = []
+            for v in model.getVars():
+                # 该列包含了被合并的items
+                if model.getCoeff(new_node.rmp.constraints[self.item1.id], v) == 1.0:
+                    load = 0
+                    for item_id, constr in new_node.rmp.constraints.items():  # constr_id == item_id
+                        if model.getCoeff(constr, v) == 1.0:
+                            load += items[item_id].width
+                    if load > capacity:
+                        del_columns.append(v)
+            for column in del_columns:
+                model.remove(column)
 
         elif self.value == 0:
             # 1.添加冲突集合中的item1和item2
@@ -150,6 +168,7 @@ class SearchTree:
             cg = CG(node)
             node.solution = cg.solve()  # 返回列生成求解的结果
             # node.rmp.model.write(f"rmp{self.n_nodes}.lp")
+
             # fathomed节点的两种情形
             # 1.该节点最小值大于当前最佳可行解目标值
             # print(self.incumbent.value, node.solution.value)
@@ -163,12 +182,17 @@ class SearchTree:
                 self.incumbent.update(node.solution)
                 if self.verbose:
                     print(f"\nFind a new feasible solution, value={node.solution.value}")
+                    # print(node.rmp.data.items)
+                    # node.rmp.model.write("test.lp")
+                    # print(node.get_solution())
+
                 continue
             if self.verbose:
                 print(f"The node should be branched, and value={node.solution.value}")
             branches = BinaryBranch().branching(node)
             for branch in branches:  # 结点分支定添加进入队列
-                self.queue.push(branch.apply(node))
+                child = branch.apply(node)
+                self.queue.push(child)
             # assert self.queue.data[0].rmp.data.items is not self.queue.data[1].rmp.data.items
         end_time = time.time()
         if self.verbose:
