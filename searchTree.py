@@ -16,6 +16,8 @@ from instance import Item
 import copy
 import time
 
+from gurobipy import GRB
+
 
 class Brancher:
     def __init__(self):
@@ -152,9 +154,30 @@ class SearchTree:
 
         self.lb = self.ub = None
 
+    def init_solution(self, model):
+        """
+        初始化解，即设置初始解，从而在搜索过程中尽可能删除 劣解
+        具体而言，设置self.ub 和 self.incumbent
+        当前使用的方法为，将主问题MasterModel中的变量设置为 0-1变量，并求解该模型
+        """
+        relaxed = model.model
+        relaxed.update()
+
+        model = relaxed.copy()
+        for v in model.getVars():
+            v.vtype = GRB.BINARY
+        model.optimize()
+
+        self.ub = round(model.objVal)
+
+        self.incumbent.value = self.ub
+
     def solve(self):
         start_time = time.time()
         m = MasterModel(self.instance, init_columns=self.init_columns)  # 初始化限制主问题(restrict master problem, RMP)
+
+        self.init_solution(m)
+
         node = Node(m)  # 初始化根节点
         if self.verbose:
             print("creating RMP in root node: done")

@@ -15,7 +15,7 @@ import cProfile
 import json
 
 if __name__ == '__main__':
-    instance = Instance('data.txt')  # 读取文件生成1D-BPP实例
+    instance = Instance('N1W2B1R5.txt')  # 读取文件生成1D-BPP实例
     print(f"{instance=}")
 
     # bp = basicmodel.BinPacking({item.id: item for item in instance.items}, instance.capacity)
@@ -24,7 +24,7 @@ if __name__ == '__main__':
     # # bp.print_variables()
     # print(f"{m.Runtime=}\t{m.objVal=}")
     print(f"-" * 60)
-    with open("js.json") as f:
+    with open("N1W2B1R5.json") as f:
         init_columns = list(json.load(f).values())
         # print(init_columns)
     tree = SearchTree(instance, verbose=True, init_columns=init_columns)  # 初始化搜索树
