@@ -4,8 +4,9 @@
 # Author: Zheng Shaoxiang
 # @Email : zhengsx95@163.com
 # Description:
-from gurobimodel import *
+# from gurobimodel import *
 from labelSetting import LabelSetting
+from gurobipy import *
 
 
 class Pricing:

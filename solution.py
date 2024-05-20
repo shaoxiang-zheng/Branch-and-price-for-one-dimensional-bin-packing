@@ -8,9 +8,10 @@ from uti import is_integer, ComparisonEpsilon
 
 
 class Solution:
-    def __init__(self, value=None, solutions=None):
+    def __init__(self, value=None, solutions=None, model=None):
         self.value = value
         self.solutions = solutions
+        self.model = model
 
     def output_solution(self):
         pass
@@ -20,10 +21,11 @@ class Solution:
         if self.value is None or \
                 other.value < self.value + ComparisonEpsilon:
             self.value, self.solutions = other.value, other.solutions
+            self.model = other.model
 
     def is_integer_solution(self):
-        for s in self.solutions:
-            if not is_integer(s.x):
+        for s in self.solutions.values():
+            if not is_integer(s):
                 return False
         return True
 

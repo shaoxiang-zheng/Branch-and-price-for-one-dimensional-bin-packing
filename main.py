@@ -12,7 +12,7 @@ from searchTree import SearchTree
 import cProfile
 
 if __name__ == '__main__':
-    instance = Instance()  # 读取文件生成1D-BPP实例
+    instance = Instance('./data.txt')  # 读取文件生成1D-BPP实例
     print(f"{instance=}")
 
     bp = basicmodel.BinPacking({item.id: item for item in instance.items}, instance.capacity)
@@ -23,4 +23,12 @@ if __name__ == '__main__':
     print(f"-" * 60)
     tree = SearchTree(instance, verbose=True)  # 初始化搜索树
     tree.solve()
+
+    rmp = tree.incumbent.model
+    rmp.update()
+    for name, v in tree.incumbent.solutions.items():
+        if v > 0.9:
+            print(name, v)
+            column = [rmp.getCoeff(constr, rmp.getVarByName(name)) for constr in rmp.getConstrs()]
+            print(column)
     # cProfile.run('tree.solve()', sort=1)
