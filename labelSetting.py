@@ -167,6 +167,9 @@ class LabelSetting:
                         print(f"item index = {i} item id = {self.data.items[i].id} is considered")
 
                     for v in [1, 0]:
+                        if v == 1 and label.w + self.data.items[i].width > self.data.capacity:
+                            continue
+
                         if self.verbose:
                             print(f"item id = {self.data.items[i].id} is " + ('packed' if v == 1 else 'discarded'))
                         new_label = label.extend(i, self.graph, v=v)

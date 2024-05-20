@@ -4,6 +4,8 @@
 # Author: Zheng Shaoxiang
 # @Email : zhengsx95@163.com
 # Description:
+import math
+
 from myQueue import MyQueue
 from bpNode import Node
 from masterModel import MasterModel
@@ -13,6 +15,8 @@ from uti import is_integer
 from instance import Item
 import copy
 import time
+
+from gurobipy import GRB
 
 
 class Brancher:
@@ -27,7 +31,7 @@ class Brancher:
 
 
 class BinaryBranch(Brancher):
-    @ staticmethod
+    @staticmethod
     def find_items(node):
         """
         :param node:
@@ -35,7 +39,8 @@ class BinaryBranch(Brancher):
         """
         x, y = None, None
         items = node.rmp.data.items
-        sols = {v.varName: v.x for v in node.get_solution()}
+        sols = {key: value for key, value in node.get_solution().items() if value > 0}
+
         min_value = float("inf")
         for ind, item in enumerate(items):
             for _ind, _item in enumerate(items):
@@ -58,7 +63,6 @@ class BinaryBranch(Brancher):
 
     def generate_branches(self, node):
         item1, item2 = self.find_items(node)  # 找到两个item
-
         return [BranchDecisions(item1, item2, 1), BranchDecisions(item1, item2, 0)]
 
 
@@ -101,6 +105,25 @@ class BranchDecisions:
                 # fixme:未更新q 考虑捕捉该函数异常
                 new_node.rmp.removeVarById(q)
 
+            # 4.删除列（该列在合并后已经不可行的列）
+            model = new_node.rmp.model
+            items = {item.id: item for item in new_node.rmp.data.items}
+            capacity = new_node.rmp.data.capacity
+
+            model.update()
+            del_columns = []
+            for v in model.getVars():
+                # 该列包含了被合并的items
+                if model.getCoeff(new_node.rmp.constraints[self.item1.id], v) == 1.0:
+                    load = 0
+                    for item_id, constr in new_node.rmp.constraints.items():  # constr_id == item_id
+                        if model.getCoeff(constr, v) == 1.0:
+                            load += items[item_id].width
+                    if load > capacity:
+                        del_columns.append(v)
+            for column in del_columns:
+                model.remove(column)
+
         elif self.value == 0:
             # 1.添加冲突集合中的item1和item2
             new_node.rmp.graph.add_edge(self.item1.id, self.item2.id)
@@ -110,7 +133,8 @@ class BranchDecisions:
                 new_node.rmp.removeVarById(p)
         else:
             raise ValueError("")
-        new_node.level += 1
+
+        new_node.level = node.level + 1
         return new_node
 
     def __repr__(self):
@@ -119,16 +143,41 @@ class BranchDecisions:
 
 
 class SearchTree:
-    def __init__(self, instance, verbose=True):
+    def __init__(self, instance, verbose=True, **kwargs):
         self.instance = instance
         self.queue = MyQueue()  # 初始化列表，默认深度优先（depth-first）
         self.incumbent = Solution()  # 初始化最优解
         self.verbose = verbose  # 是否打印相关参数
         self.n_nodes = 0  # 求解的总结点数目
 
+        self.init_columns = kwargs.get('init_columns', None)
+
+        self.lb = self.ub = None
+
+    def init_solution(self, model):
+        """
+        初始化解，即设置初始解，从而在搜索过程中尽可能删除 劣解
+        具体而言，设置self.ub 和 self.incumbent
+        当前使用的方法为，将主问题MasterModel中的变量设置为 0-1变量，并求解该模型
+        """
+        relaxed = model.model
+        relaxed.update()
+
+        model = relaxed.copy()
+        for v in model.getVars():
+            v.vtype = GRB.BINARY
+        model.optimize()
+
+        self.ub = round(model.objVal)
+
+        self.incumbent.value = self.ub
+
     def solve(self):
         start_time = time.time()
-        m = MasterModel(self.instance)  # 初始化限制主问题(restrict master problem, RMP)
+        m = MasterModel(self.instance, init_columns=self.init_columns)  # 初始化限制主问题(restrict master problem, RMP)
+
+        self.init_solution(m)
+
         node = Node(m)  # 初始化根节点
         if self.verbose:
             print("creating RMP in root node: done")
@@ -136,6 +185,9 @@ class SearchTree:
         if self.verbose:
             print(f"\nSearch strategy: {self.queue.strategy}-first")
         while not self.queue.empty():
+            if self.lb is not None and self.ub is not None and abs(self.lb - self.ub) <= 1e-4:
+                break
+
             node = self.queue.pop()  # 弹出节点
             self.n_nodes += 1
             if self.verbose:
@@ -145,9 +197,16 @@ class SearchTree:
             # print(f"{node.rmp.data.n=}")
             cg = CG(node)
             node.solution = cg.solve()  # 返回列生成求解的结果
+            if self.n_nodes == 1:
+                self.lb = math.ceil(node.solution.value)
+
+            if node.solution is None:
+                continue
             # node.rmp.model.write(f"rmp{self.n_nodes}.lp")
+
             # fathomed节点的两种情形
             # 1.该节点最小值大于当前最佳可行解目标值
+            # print(self.incumbent.value, node.solution.value)
             if self.incumbent.value is not None and \
                     self.incumbent.value <= node.solution.value:
                 if self.verbose:
@@ -156,14 +215,20 @@ class SearchTree:
             # 2.该节点是可行解
             if node.solution.is_integer_solution():  # 如果是整数解，比较更新结果
                 self.incumbent.update(node.solution)
+                self.ub = self.incumbent.value
                 if self.verbose:
                     print(f"\nFind a new feasible solution, value={node.solution.value}")
+                    # print(node.rmp.data.items)
+                    # node.rmp.model.write("test.lp")
+                    # print(node.get_solution())
+
                 continue
             if self.verbose:
                 print(f"The node should be branched, and value={node.solution.value}")
             branches = BinaryBranch().branching(node)
             for branch in branches:  # 结点分支定添加进入队列
-                self.queue.push(branch.apply(node))
+                child = branch.apply(node)
+                self.queue.push(child)
             # assert self.queue.data[0].rmp.data.items is not self.queue.data[1].rmp.data.items
         end_time = time.time()
         if self.verbose:

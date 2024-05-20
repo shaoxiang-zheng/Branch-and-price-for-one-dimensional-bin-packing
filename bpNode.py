@@ -28,27 +28,21 @@ class Node:
         return self.solution.solutions
 
     def update_param(self, coe):
-
-        for c in coe:
-            self.update_pq(c)
-
-    def update_pq(self, coe):
-
-        items = self.rmp.data.items
         var_num = self.rmp.var_num
+        for c in coe:
+            var_num += 1
+            self.update_pq(c, var_num)
+
+    def update_pq(self, coe, var_num):
+        items = self.rmp.data.items
         for i, item in enumerate(items):
             for j, _item in enumerate(items):
                 if i < j:
                     if coe[i] == 1 and coe[j] == 1:
-                        if self.p.get((item.id, _item.id), None) is None:
-                            self.p[item.id, _item.id] = {var_num + 1}
-                        else:
-                            self.p[item.id, _item.id].add(var_num + 1)
+                        self.p.setdefault((item.id, _item.id), set()).add(var_num)
+
                     elif coe[i] + coe[j] == 1:
-                        if self.q.get((item.id, _item.id), None) is None:
-                            self.q[item.id, _item.id] = {var_num + 1}
-                        else:
-                            self.q[item.id, _item.id].add(var_num + 1)
+                        self.q.setdefault((item.id, _item.id), set()).add(var_num)
 
     def __le__(self, other):
         return self.solution.value <= other.solution.value + ComparisonEpsilon

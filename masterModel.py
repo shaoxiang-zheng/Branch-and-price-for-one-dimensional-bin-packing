@@ -62,11 +62,12 @@ class MasterModel:
         self.add_cuts = add_cuts  # add inequalities or not
         self.pricing = kwargs.get('pricing', None)  # Pricing class
         self.x = kwargs.get('x', None)  # x variables
-        self.var_num = self.data.n  # number of variables
+        self.var_num = kwargs.get("var_num", None)  # number of variables
         self.constraints, self.sr = \
             kwargs.get('constraints', None), kwargs.get('sr', None)  # constraints
         self.s = kwargs.get('s', None)  # sr inequality index ((1, 2, 3), (4, 5, 6),...)
         self.graph = kwargs.get('graph', Graph())  # 初始化无向图定义不相容的边
+        self.init_columns = kwargs.get("init_columns", None)
         self.item_id = [item.id for item in self.data.items]  # item_id
         if add_cuts and self.s is None:
             self.initialize_param()
@@ -94,8 +95,8 @@ class MasterModel:
         s = self.s
         graph = copy.deepcopy(self.graph)
 
-        return MasterModel(data=data, add_cuts=self.add_cuts, model=model, pricing=pricing, x=x, constraints=constraints,
-                           sr=sr, s=s, graph=graph)
+        return MasterModel(data=data, add_cuts=self.add_cuts, model=model, pricing=pricing, x=x,
+                           constraints=constraints, sr=sr, s=s, graph=graph, var_num=self.var_num)
 
     def initialize_param(self, enu_class=SeparateEnumerate):
         enu = enu_class(self.item_id)
@@ -116,19 +117,33 @@ class MasterModel:
             self.model.addVar(vtype=GRB.CONTINUOUS, obj=1, column=col, name=f"x[{self.var_num}]")
 
     def initialize_model(self):
-        x_index = tuple(range(1, self.data.n + 1))
-        self.x = self.model.addVars(x_index, vtype=GRB.CONTINUOUS, name="x")
-        self.constraints = self.model.addConstrs(
-            (self.x[i] == 1 for i in x_index), name="exact")
+        if self.init_columns is None:
+            x_index = tuple(range(1, self.data.n + 1))
+            self.x = self.model.addVars(x_index, vtype=GRB.CONTINUOUS, name="x")
+            self.constraints = self.model.addConstrs(
+                (self.x[i] == 1 for i in x_index), name="exact")
 
-        self.setObjective(self.x.sum(), GRB.MINIMIZE)
-        if self.add_cuts:
+            self.setObjective(self.x.sum(), GRB.MINIMIZE)
+            if self.add_cuts:
+                self.sr = self.model.addConstrs((0 <= 1 for _ in self.s), name="sr")
+                for c in self.sr.values():
+                    c.setAttr("RHS", 1)
+        else:
+            x_index = tuple(range(1, len(self.init_columns) + 1))
+            self.x = self.model.addVars(x_index, vtype=GRB.CONTINUOUS, name="x")
+            self.constraints = self.model.addConstrs((
+                quicksum(self.x[i] * self.init_columns[i - 1][j - 1] for i in x_index) == 1
+                for j in range(1, self.data.n + 1)
+            ), name="exact")
+            self.setObjective(self.x.sum(), GRB.MINIMIZE)
 
-            self.sr = self.model.addConstrs((0 <= 1 for _ in self.s), name="sr")
-
-            for c in self.sr.values():
-                c.setAttr("RHS", 1)
-
+            if self.add_cuts:
+                self.sr = self.model.addConstrs((quicksum(
+                    self.x[i] * int(self.init_columns[i - 1][p - 1] +
+                                    self.init_columns[i - 1][q - 1] +
+                                    self.init_columns[i - 1][r - 1] >= 2)
+                    for i in x_index) <= 1 for p, q, r in self.s), name="sr")
+        self.var_num = len(x_index)
         self.model.update()
         self.set_parameters()
 
